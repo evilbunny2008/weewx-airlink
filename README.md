@@ -93,6 +93,7 @@ If you don't meet the following requirements, do not install this extension.
 
    ```
    [AirLink]
+       # extra_verbose = true
        [[Sensor1]]
            enable = true
            hostname = airlink

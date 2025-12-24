@@ -41,6 +41,8 @@ from weewx.engine import StdService
 
 log = logging.getLogger(__name__)
 
+extra_verbose = True
+
 WEEWX_AIRLINK_VERSION = "1.4"
 
 if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 7):
@@ -115,14 +117,16 @@ def get_concentrations(cfg: Configuration):
                                   source.timeout,
                                   cfg.archive_interval)
             if record is not None:
-                log.debug('get_concentrations: source: %s' % record)
+                if extra_verbose:
+                    log.debug('get_concentrations: source: %s' % record)
                 reading_ts = to_int(record['dateTime'])
                 age_of_reading = time.time() - reading_ts
                 if age_of_reading > cfg.archive_interval:
                     log.info('Reading from %s:%d is old: %d seconds.' % (
                         source.hostname, source.port, age_of_reading))
                     continue
-                log.debug('get_concentrations: record: %s' % record)
+                if extra_verbose:
+                    log.debug('get_concentrations: record: %s' % record)
                 concentrations = Concentrations(
                     timestamp      = reading_ts,
                     pm_1_last      = record['pm_1_last'],
@@ -136,7 +140,8 @@ def get_concentrations(cfg: Configuration):
                     hum            = record['hum'],
                     temp           = record['temp'],
                 )
-                log.debug('get_concentrations: concentrations: %s' % concentrations)
+                if extra_verbose:
+                    log.debug('get_concentrations: concentrations: %s' % concentrations)
                 return concentrations
     log.error('Could not get concentrations from any source.')
     return None
@@ -231,14 +236,17 @@ def collect_data(hostname, port, timeout, archive_interval):
 
     try:
         # fetch data
-        log.debug('collect_data: fetching from url: %s, timeout: %d' % (url, timeout))
+        if extra_verbose:
+            log.debug('collect_data: fetching from url: %s, timeout: %d' % (url, timeout))
         r = requests.get(url=url, timeout=timeout)
         r.raise_for_status()
-        log.debug('collect_data: %s returned %r' % (hostname, r))
+        if extra_verbose:
+            log.debug('collect_data: %s returned %r' % (hostname, r))
         if r:
             # convert to json
             j = r.json()
-            log.debug('collect_data: json returned from %s is: %r' % (hostname, j))
+            if extra_verbose:
+                log.debug('collect_data: json returned from %s is: %r' % (hostname, j))
             # Check for error
             if 'error' in j and j['error'] is not None:
                 error = j['error']
@@ -293,7 +301,8 @@ def collect_data(hostname, port, timeout, archive_interval):
         return None
 
     # create a record
-    log.debug('Successful read from %s.' % hostname)
+    if extra_verbose:
+        log.debug('Successful read from %s.' % hostname)
     return populate_record(time_of_reading, j)
 
 def populate_record(ts, j):
@@ -352,6 +361,9 @@ class AirLink(StdService):
     """Collect AirLink air quality measurements."""
 
     def __init__(self, engine, config_dict):
+
+        global extra_verbose
+
         super(AirLink, self).__init__(engine, config_dict)
         log.info("Service version is %s." % WEEWX_AIRLINK_VERSION)
 
@@ -365,6 +377,15 @@ class AirLink(StdService):
             archive_delay    = to_int(config_dict['StdArchive'].get('archive_delay', 15)),
             poll_interval    = 5,
             sources          = AirLink.configure_sources(self.config_dict))
+
+        extra_verbose = to_bool(self.config_dict.get('extra_verbose', True))
+
+        if not extra_verbose:
+            log.info('Extra verbose logging disabled')
+            logging.getLogger("urllib3").setLevel(logging.WARNING)
+        else:
+            log.info('Extra verbose logging enabled')
+
         with self.cfg.lock:
             self.cfg.concentrations = get_concentrations(self.cfg)
 
@@ -390,31 +411,37 @@ class AirLink(StdService):
             self.bind(weewx.NEW_LOOP_PACKET, self.new_loop_packet)
 
     def new_loop_packet(self, event):
-        log.debug('new_loop_packet(%s)' % event)
+        if extra_verbose:
+            log.debug('new_loop_packet(%s)' % event)
         AirLink.fill_in_packet(self.cfg, event.packet)
 
     @staticmethod
     def fill_in_packet(cfg: Configuration, packet: Dict):
         with cfg.lock:
-            log.debug('new_loop_packet: cfg.concentrations: %s' % cfg.concentrations)
+            if extra_verbose:
+                log.debug('new_loop_packet: cfg.concentrations: %s' % cfg.concentrations)
             if cfg.concentrations is not None and \
                     cfg.concentrations.timestamp is not None and \
                     cfg.concentrations.timestamp + \
                     cfg.archive_interval >= time.time():
-                log.debug('Time of reading being inserted: %s' % timestamp_to_string(cfg.concentrations.timestamp))
+                if extra_verbose:
+                    log.debug('Time of reading being inserted: %s' % timestamp_to_string(cfg.concentrations.timestamp))
                 # Insert pm1_0, pm2_5, pm10_0, aqi and aqic into loop packet.
                 if cfg.concentrations.pm_1_last is not None:
                     packet['pm1_0'] = cfg.concentrations.pm_1_last
-                    log.debug('Inserted packet[pm1_0]: %f into packet.' % cfg.concentrations.pm_1_last)
+                    if extra_verbose:
+                        log.debug('Inserted packet[pm1_0]: %f into packet.' % cfg.concentrations.pm_1_last)
                 if cfg.concentrations.pm_2p5_last is not None:
                     packet['pm2_5'] = cfg.concentrations.pm_2p5_last
-                    log.debug('Inserted packet[pm2_5]: %f into packet.' % cfg.concentrations.pm_2p5_last)
+                    if extra_verbose:
+                        log.debug('Inserted packet[pm2_5]: %f into packet.' % cfg.concentrations.pm_2p5_last)
                     # Put aqi and color in the packet.
                     packet['pm2_5_aqi'] = AQI.compute_pm2_5_aqi(packet['pm2_5'])
                     packet['pm2_5_aqi_color'] = AQI.compute_pm2_5_aqi_color(packet['pm2_5_aqi'])
                 if cfg.concentrations.pm_10_last is not None:
                     packet['pm10_0'] = cfg.concentrations.pm_10_last
-                    log.debug('Inserted packet[pm10_0]: %f into packet.' % cfg.concentrations.pm_10_last)
+                    if extra_verbose:
+                        log.debug('Inserted packet[pm10_0]: %f into packet.' % cfg.concentrations.pm_10_last)
 
                 # Also insert one minute averages as these averages are more useful for showing in realtime.
                 # If 1m averages are not available, use last instead.
@@ -465,20 +492,24 @@ class DevicePoller:
         self.cfg = cfg
 
     def poll_device(self) -> None:
-        log.debug('poll_device: start')
+        if extra_verbose:
+            log.debug('poll_device: start')
         while True:
             try:
-                log.debug('poll_device: calling get_concentrations.')
+                if extra_verbose:
+                    log.debug('poll_device: calling get_concentrations.')
                 concentrations = get_concentrations(self.cfg)
             except Exception as e:
                 log.error('poll_device exception: %s' % e)
                 weeutil.logger.log_traceback(log.critical, "    ****  ")
                 concentrations = None
-            log.debug('poll_device: concentrations: %s' % concentrations)
+            if extra_verbose:
+                log.debug('poll_device: concentrations: %s' % concentrations)
             if concentrations is not None:
                 with self.cfg.lock:
                     self.cfg.concentrations = concentrations
-            log.debug('poll_device: Sleeping for %d seconds.' % self.cfg.poll_interval)
+            if extra_verbose:
+                log.debug('poll_device: Sleeping for %d seconds.' % self.cfg.poll_interval)
             time.sleep(self.cfg.poll_interval)
 
 class AQI(weewx.xtypes.XType):
@@ -566,10 +597,12 @@ class AQI(weewx.xtypes.XType):
 
     @staticmethod
     def get_scalar(obs_type, record, db_manager=None):
-        log.debug('get_scalar(%s)' % obs_type)
+        if extra_verbose:
+            log.debug('get_scalar(%s)' % obs_type)
         if obs_type not in [ 'pm2_5_aqi', 'pm2_5_aqi_color' ]:
             raise weewx.UnknownType(obs_type)
-        log.debug('get_scalar(%s)' % obs_type)
+        if extra_verbose:
+            log.debug('get_scalar(%s)' % obs_type)
         if record is None:
             log.debug('get_scalar called where record is None.')
             raise weewx.CannotCalculate(obs_type)
@@ -583,8 +616,9 @@ class AQI(weewx.xtypes.XType):
             # Returning CannotCalculate causes exception in ImageGenerator, return UnknownType instead.
             # ERROR weewx.reportengine: Caught unrecoverable exception in generator 'weewx.imagegenerator.ImageGenerator'
             # Any archive catchup records will have None for pm2_5.
-            log.debug('get_scalar called where record[pm2_5] is None: %s.  Probably a catchup record.' %
-                timestamp_to_string(record['dateTime']))
+            if extra_verbose:
+                log.debug('get_scalar called where record[pm2_5] is None: %s.  Probably a catchup record.' %
+                    timestamp_to_string(record['dateTime']))
             raise weewx.UnknownType(obs_type)
         try:
             pm2_5 = record['pm2_5']
@@ -678,9 +712,10 @@ class AQI(weewx.xtypes.XType):
         if obs_type not in [ 'pm2_5_aqi', 'pm2_5_aqi_color' ]:
             raise weewx.UnknownType(obs_type)
 
-        log.debug('get_aggregate(%s, %s, %s, aggregate:%s)' % (
-            obs_type, timestamp_to_string(timespan.start),
-            timestamp_to_string(timespan.stop), aggregate_type))
+        if extra_verbose:
+            log.debug('get_aggregate(%s, %s, %s, aggregate:%s)' % (
+                obs_type, timestamp_to_string(timespan.start),
+                timestamp_to_string(timespan.stop), aggregate_type))
 
         aggregate_type = aggregate_type.lower()
 
@@ -710,9 +745,10 @@ class AQI(weewx.xtypes.XType):
                 value = AQI.compute_pm2_5_aqi_color(AQI.compute_pm2_5_aqi(value))
         t, g = weewx.units.getStandardUnitType(std_unit_system, obs_type, aggregate_type)
         # Form the ValueTuple and return it:
-        log.debug('get_aggregate(%s, %s, %s, aggregate:%s, select_stmt: %s, returning %s)' % (
-            obs_type, timestamp_to_string(timespan.start), timestamp_to_string(timespan.stop),
-            aggregate_type, select_stmt, value))
+        if extra_verbose:
+            log.debug('get_aggregate(%s, %s, %s, aggregate:%s, select_stmt: %s, returning %s)' % (
+                obs_type, timestamp_to_string(timespan.start), timestamp_to_string(timespan.stop),
+                aggregate_type, select_stmt, value))
         return weewx.units.ValueTuple(value, t, g)
 
 if __name__ == "__main__":
