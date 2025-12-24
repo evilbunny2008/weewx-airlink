@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Tuple
 
 import weeutil.weeutil
 import weewx
+import weewx.wxformulas
 import weewx.units
 import weewx.xtypes
 
@@ -39,11 +40,11 @@ from weeutil.weeutil import to_bool
 from weeutil.weeutil import to_int
 from weewx.engine import StdService
 
-log = logging.getLogger(__name__)
-
 extra_verbose = True
 
-WEEWX_AIRLINK_VERSION = "1.4"
+log = logging.getLogger(__name__)
+
+WEEWX_AIRLINK_VERSION = "1.5.0"
 
 if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 7):
     raise weewx.UnsupportedFeature(
@@ -77,6 +78,11 @@ weewx.units.obs_group_dict['pm2_5_1m'] = 'group_concentration'
 weewx.units.obs_group_dict['pm2_5_1m_aqi'] = 'air_quality_index'
 weewx.units.obs_group_dict['pm2_5_1m_aqi_color'] = 'air_quality_color'
 
+weewx.units.obs_group_dict['airlink_dew_point'] = 'group_temperature'
+weewx.units.obs_group_dict['airlink_heat_index'] = 'group_temperature'
+weewx.units.obs_group_dict['airlink_temp'] = 'group_temperature'
+weewx.units.obs_group_dict['airlink_wet_bulb'] = 'group_temperature'
+
 class Source:
     def __init__(self, config_dict, name):
         # Raise KeyEror if name not in dictionary.
@@ -97,8 +103,11 @@ class Concentrations:
     pm_10         : float
     pm_2p5_nowcast: float
     pm_10_nowcast : float
-    hum           : float
-    temp          : float
+    airlink_dew_point : float
+    airlink_heat_index : float
+    airlink_hum   : float
+    airlink_temp  : float
+    airlink_wet_bulb : float
 
 @dataclass
 class Configuration:
@@ -116,17 +125,22 @@ def get_concentrations(cfg: Configuration):
                                   source.port,
                                   source.timeout,
                                   cfg.archive_interval)
+
             if record is not None:
                 if extra_verbose:
                     log.debug('get_concentrations: source: %s' % record)
+
                 reading_ts = to_int(record['dateTime'])
                 age_of_reading = time.time() - reading_ts
+
                 if age_of_reading > cfg.archive_interval:
                     log.info('Reading from %s:%d is old: %d seconds.' % (
                         source.hostname, source.port, age_of_reading))
                     continue
+
                 if extra_verbose:
                     log.debug('get_concentrations: record: %s' % record)
+
                 concentrations = Concentrations(
                     timestamp      = reading_ts,
                     pm_1_last      = record['pm_1_last'],
@@ -137,12 +151,18 @@ def get_concentrations(cfg: Configuration):
                     pm_10          = record['pm_10'],
                     pm_2p5_nowcast = record['pm_2p5_nowcast'],
                     pm_10_nowcast  = record['pm_10_nowcast'],
-                    hum            = record['hum'],
-                    temp           = record['temp'],
+                    airlink_dew_point = record['airlink_dew_point'],
+                    airlink_heat_index = record['airlink_heat_index'],
+                    airlink_hum    = record['airlink_hum'],
+                    airlink_temp   = record['airlink_temp'],
+                    airlink_wet_bulb = record['airlink_wet_bulb'],
                 )
+
                 if extra_verbose:
                     log.debug('get_concentrations: concentrations: %s' % concentrations)
+
                 return concentrations
+
     log.error('Could not get concentrations from any source.')
     return None
 
@@ -177,7 +197,7 @@ def convert_data_structure_type_5_to_6(j: Dict[str, Any]) -> None:
         j['data']['conditions'][0]['pm_10p0_nowcast'] = None
 
         j['data']['conditions'][0]['data_structure_type'] = 6
-        log.debug('Converted type 5 record to type 6.')
+        log.info('Converted type 5 record to type 6.')
     except Exception as e:
         log.info('convert_data_structure_type_5_to_6: exception: %s' % e)
         # Let sanity check handle the issue.
@@ -238,15 +258,19 @@ def collect_data(hostname, port, timeout, archive_interval):
         # fetch data
         if extra_verbose:
             log.debug('collect_data: fetching from url: %s, timeout: %d' % (url, timeout))
+
         r = requests.get(url=url, timeout=timeout)
         r.raise_for_status()
+
         if extra_verbose:
             log.debug('collect_data: %s returned %r' % (hostname, r))
+
         if r:
             # convert to json
             j = r.json()
             if extra_verbose:
                 log.debug('collect_data: json returned from %s is: %r' % (hostname, j))
+
             # Check for error
             if 'error' in j and j['error'] is not None:
                 error = j['error']
@@ -254,15 +278,19 @@ def collect_data(hostname, port, timeout, archive_interval):
                 message = error['message']
                 log.error('%s returned error(%d): %s' % (url, code, message))
                 return None
+
             # If data structure type 5, convert it to 6.
             if j['data']['conditions'][0]['data_structure_type'] == 5:
                 convert_data_structure_type_5_to_6(j)
+
             # Check for sanity
             sane, msg = is_sane(j)
             if not sane:
                 log.error('Reading not sane:  %s (%s)' % (msg, j))
                 return None
+
             time_of_reading = j['data']['conditions'][0]['last_report_time']
+
             # The reading could be old.
             # Check that it's not older than now - arcint
             age_of_reading = time.time() - time_of_reading
@@ -303,6 +331,7 @@ def collect_data(hostname, port, timeout, archive_interval):
     # create a record
     if extra_verbose:
         log.debug('Successful read from %s.' % hostname)
+
     return populate_record(time_of_reading, j)
 
 def populate_record(ts, j):
@@ -321,11 +350,7 @@ def populate_record(ts, j):
             return None
 
     record['last_report_time'] = get_and_update_missed('last_report_time')
-    record['temp'] = get_and_update_missed('temp')
-    record['hum'] = get_and_update_missed('hum')
-    record['dew_point'] = get_and_update_missed('dew_point')
-    record['wet_bulb'] = get_and_update_missed('wet_bulb')
-    record['heat_index'] = get_and_update_missed('heat_index')
+
     record['pct_pm_data_last_1_hour'] = get_and_update_missed('pct_pm_data_last_1_hour')
     record['pct_pm_data_last_3_hours'] = get_and_update_missed('pct_pm_data_last_3_hours')
     record['pct_pm_data_nowcast'] = get_and_update_missed('pct_pm_data_nowcast')
@@ -338,6 +363,7 @@ def populate_record(ts, j):
     # Copy in all of the concentrations.
     record['pm_1'] = get_and_update_missed('pm_1')
     record['pm_1_last'] = get_and_update_missed('pm_1_last')
+
     for prefix in ['pm_2p5', 'pm_10']:
         key = prefix + '_last'
         record[key] = get_and_update_missed(key)
@@ -352,8 +378,12 @@ def populate_record(ts, j):
         key = prefix + '_nowcast'
         record[key] = get_and_update_missed(key)
 
+    for key in ('dew_point', 'heat_index', 'hum', 'temp', 'wet_bulb'):
+        if key in j['data']['conditions'][0] and j['data']['conditions'][0][key] is not None:
+            record['airlink_' + key] = j['data']['conditions'][0][key]
+
     if missed:
-        log.info("Sensor didn't report field(s): %s" % ','.join(missed))
+         log.info("Sensor didn't report field(s): %s" % ','.join(missed))
 
     return record
 
@@ -368,6 +398,13 @@ class AirLink(StdService):
         log.info("Service version is %s." % WEEWX_AIRLINK_VERSION)
 
         self.engine = engine
+
+        #self.target_unit_nickname = config_dict['StdConvert']['target_unit']
+        #self.target_unit = weewx.units.unit_constants[self.target_unit_nickname.upper()]
+
+        #log.info(f"target_unit_nickname: {self.target_unit_nickname}")
+        #log.info(f"target_unit: {self.target_unit}")
+
         self.config_dict = config_dict.get('AirLink', {})
 
         self.cfg = Configuration(
@@ -396,6 +433,7 @@ class AirLink(StdService):
                 log.info(
                     'Source %d for AirLink readings: %s:%s, timeout: %d' % (
                     source_count, source.hostname, source.port, source.timeout))
+
         if source_count == 0:
             log.error('No sources configured for airlink extension.  AirLink extension is inoperable.')
         else:
@@ -420,17 +458,21 @@ class AirLink(StdService):
         with cfg.lock:
             if extra_verbose:
                 log.debug('new_loop_packet: cfg.concentrations: %s' % cfg.concentrations)
+
             if cfg.concentrations is not None and \
                     cfg.concentrations.timestamp is not None and \
                     cfg.concentrations.timestamp + \
                     cfg.archive_interval >= time.time():
+
                 if extra_verbose:
                     log.debug('Time of reading being inserted: %s' % timestamp_to_string(cfg.concentrations.timestamp))
+
                 # Insert pm1_0, pm2_5, pm10_0, aqi and aqic into loop packet.
                 if cfg.concentrations.pm_1_last is not None:
                     packet['pm1_0'] = cfg.concentrations.pm_1_last
                     if extra_verbose:
                         log.debug('Inserted packet[pm1_0]: %f into packet.' % cfg.concentrations.pm_1_last)
+
                 if cfg.concentrations.pm_2p5_last is not None:
                     packet['pm2_5'] = cfg.concentrations.pm_2p5_last
                     if extra_verbose:
@@ -438,6 +480,7 @@ class AirLink(StdService):
                     # Put aqi and color in the packet.
                     packet['pm2_5_aqi'] = AQI.compute_pm2_5_aqi(packet['pm2_5'])
                     packet['pm2_5_aqi_color'] = AQI.compute_pm2_5_aqi_color(packet['pm2_5_aqi'])
+
                 if cfg.concentrations.pm_10_last is not None:
                     packet['pm10_0'] = cfg.concentrations.pm_10_last
                     if extra_verbose:
@@ -449,10 +492,12 @@ class AirLink(StdService):
                     packet['pm1_0_1m']       = cfg.concentrations.pm_1
                 elif cfg.concentrations.pm_1_last is not None:
                     packet['pm1_0_1m']       = cfg.concentrations.pm_1_last
+
                 if cfg.concentrations.pm_2p5 is not None:
                     packet['pm2_5_1m']       = cfg.concentrations.pm_2p5
                 elif cfg.concentrations.pm_2p5_last is not None:
                     packet['pm2_5_1m']       = cfg.concentrations.pm_2p5_last
+
                 if cfg.concentrations.pm_10 is not None:
                     packet['pm10_0_1m']      = cfg.concentrations.pm_10
                 elif cfg.concentrations.pm_10_last is not None:
@@ -469,8 +514,27 @@ class AirLink(StdService):
                     packet['pm2_5_nowcast']  = cfg.concentrations.pm_2p5_nowcast
                     packet['pm2_5_nowcast_aqi'] = AQI.compute_pm2_5_aqi(packet['pm2_5_nowcast'])
                     packet['pm2_5_nowcast_aqi_color'] = AQI.compute_pm2_5_aqi_color(packet['pm2_5_nowcast_aqi'])
+
                 if cfg.concentrations.pm_10_nowcast is not None:
                     packet['pm10_0_nowcast'] = cfg.concentrations.pm_10_nowcast
+
+                # Might as well pull in the other data too
+
+                if cfg.concentrations.airlink_dew_point is not None:
+                    packet['airlink_dew_point'] = cfg.concentrations.airlink_dew_point
+
+                if cfg.concentrations.airlink_heat_index is not None:
+                    packet['airlink_heat_index'] = cfg.concentrations.airlink_heat_index
+
+                if cfg.concentrations.airlink_hum is not None:
+                    packet['airlink_hum'] = cfg.concentrations.airlink_hum
+
+                if cfg.concentrations.airlink_temp is not None:
+                    packet['airlink_temp'] = cfg.concentrations.airlink_temp
+
+                if cfg.concentrations.airlink_wet_bulb is not None:
+                    packet['airlink_wet_bulb'] = cfg.concentrations.airlink_wet_bulb
+
             else:
                 log.error('Found no concentrations to insert.')
 
@@ -494,6 +558,7 @@ class DevicePoller:
     def poll_device(self) -> None:
         if extra_verbose:
             log.debug('poll_device: start')
+
         while True:
             try:
                 if extra_verbose:
@@ -503,13 +568,17 @@ class DevicePoller:
                 log.error('poll_device exception: %s' % e)
                 weeutil.logger.log_traceback(log.critical, "    ****  ")
                 concentrations = None
+
             if extra_verbose:
                 log.debug('poll_device: concentrations: %s' % concentrations)
+
             if concentrations is not None:
                 with self.cfg.lock:
                     self.cfg.concentrations = concentrations
+
             if extra_verbose:
                 log.debug('poll_device: Sleeping for %d seconds.' % self.cfg.poll_interval)
+
             time.sleep(self.cfg.poll_interval)
 
 class AQI(weewx.xtypes.XType):
@@ -524,20 +593,26 @@ class AQI(weewx.xtypes.XType):
     agg_sql_dict = {
         'avg': "SELECT AVG(pm2_5), usUnits FROM %(table_name)s "
                "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL",
+
         'count': "SELECT COUNT(dateTime), usUnits FROM %(table_name)s "
                  "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL",
+
         'first': "SELECT pm2_5, usUnits FROM %(table_name)s "
                  "WHERE dateTime = (SELECT MIN(dateTime) FROM %(table_name)s "
                  "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL",
+
         'last': "SELECT pm2_5, usUnits FROM %(table_name)s "
                 "WHERE dateTime = (SELECT MAX(dateTime) FROM %(table_name)s "
                 "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL",
+
         'min': "SELECT pm2_5, usUnits FROM %(table_name)s "
                "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL "
                "ORDER BY pm2_5 ASC LIMIT 1;",
+
         'max': "SELECT pm2_5, usUnits FROM %(table_name)s "
                "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL "
                "ORDER BY pm2_5 DESC LIMIT 1;",
+
         'sum': "SELECT SUM(pm2_5), usUnits FROM %(table_name)s "
                "WHERE dateTime > %(start)s AND dateTime <= %(stop)s AND pm2_5 IS NOT NULL)",
     }
@@ -597,21 +672,27 @@ class AQI(weewx.xtypes.XType):
 
     @staticmethod
     def get_scalar(obs_type, record, db_manager=None):
+
         if extra_verbose:
             log.debug('get_scalar(%s)' % obs_type)
+
         if obs_type not in [ 'pm2_5_aqi', 'pm2_5_aqi_color' ]:
             raise weewx.UnknownType(obs_type)
+
         if extra_verbose:
             log.debug('get_scalar(%s)' % obs_type)
+
         if record is None:
             log.debug('get_scalar called where record is None.')
             raise weewx.CannotCalculate(obs_type)
+
         if 'pm2_5' not in record:
             # Should not see this as pm2_5 is part of the extended schema that is required for this plugin.
             # Returning CannotCalculate causes exception in ImageGenerator, return UnknownType instead.
             # ERROR weewx.reportengine: Caught unrecoverable exception in generator 'weewx.imagegenerator.ImageGenerator'
-            log.info('get_scalar called where record does not contain pm2_5.  This is unexpected.')
+            log.error('get_scalar called where record does not contain pm2_5.  This is unexpected.')
             raise weewx.UnknownType(obs_type)
+
         if record['pm2_5'] is None:
             # Returning CannotCalculate causes exception in ImageGenerator, return UnknownType instead.
             # ERROR weewx.reportengine: Caught unrecoverable exception in generator 'weewx.imagegenerator.ImageGenerator'
@@ -619,14 +700,19 @@ class AQI(weewx.xtypes.XType):
             if extra_verbose:
                 log.debug('get_scalar called where record[pm2_5] is None: %s.  Probably a catchup record.' %
                     timestamp_to_string(record['dateTime']))
+
             raise weewx.UnknownType(obs_type)
         try:
             pm2_5 = record['pm2_5']
+
             if obs_type == 'pm2_5_aqi':
                 value = AQI.compute_pm2_5_aqi(pm2_5)
+
             if obs_type == 'pm2_5_aqi_color':
                 value = AQI.compute_pm2_5_aqi_color(AQI.compute_pm2_5_aqi(pm2_5))
+
             t, g = weewx.units.getStandardUnitType(record['usUnits'], obs_type)
+
             # Form the ValueTuple and return it:
             return weewx.units.ValueTuple(value, t, g)
         except KeyError:
@@ -674,12 +760,15 @@ class AQI(weewx.xtypes.XType):
 
                 if obs_type == 'pm2_5_aqi':
                     value = AQI.compute_pm2_5_aqi(pm2_5)
+
                 if obs_type == 'pm2_5_aqi_color':
                     value = AQI.compute_pm2_5_aqi_color(AQI.compute_pm2_5_aqi(pm2_5))
+
                 if extra_verbose:
                     log.debug('get_series(%s): %s - %s - %s' % (obs_type,
                         timestamp_to_string(ts - interval * 60),
                         timestamp_to_string(ts), value))
+
                 start_vec.append(ts - interval * 60)
                 stop_vec.append(ts)
                 data_vec.append(value)
@@ -743,58 +832,16 @@ class AQI(weewx.xtypes.XType):
         if value is not None:
             if obs_type == 'pm2_5_aqi':
                 value = AQI.compute_pm2_5_aqi(value)
+
             if obs_type == 'pm2_5_aqi_color':
                 value = AQI.compute_pm2_5_aqi_color(AQI.compute_pm2_5_aqi(value))
+
         t, g = weewx.units.getStandardUnitType(std_unit_system, obs_type, aggregate_type)
+
         # Form the ValueTuple and return it:
         if extra_verbose:
             log.debug('get_aggregate(%s, %s, %s, aggregate:%s, select_stmt: %s, returning %s)' % (
                 obs_type, timestamp_to_string(timespan.start), timestamp_to_string(timespan.stop),
                 aggregate_type, select_stmt, value))
+
         return weewx.units.ValueTuple(value, t, g)
-
-if __name__ == "__main__":
-    usage = """%prog [options] [--help] [--debug]"""
-
-    import weeutil.logger
-
-    def main():
-        import optparse
-        parser = optparse.OptionParser(usage=usage)
-        parser.add_option('--config', dest='cfgfn', type=str, metavar="FILE",
-                          help="Use configuration file FILE. Default is /etc/weewx/weewx.conf or /home/weewx/weewx.conf")
-        parser.add_option('--test-extension', dest='te', action='store_true',
-                          help='test the data collector')
-        parser.add_option('--hostname', dest='hostname', action='store',
-                          help='hostname to use with --test-collector')
-        parser.add_option('--port', dest='port', action='store',
-                          type=int, default=80,
-                          help="port to use with --test-collector. Default is '80'")
-        (options, args) = parser.parse_args()
-
-        weeutil.logger.setup('airlink', {})
-
-        if options.te:
-            if not options.hostname:
-                parser.error('--test-collector requires --hostname argument')
-            test_extension(options.hostname, options.port)
-
-    def test_extension(hostname, port):
-        sources = [Source({'Sensor1': { 'enable': True, 'hostname': hostname, 'port': port, 'timeout': 2}}, 'Sensor1')]
-        cfg = Configuration(
-            lock             = threading.Lock(),
-            concentrations   = None,
-            archive_interval = 300,
-            archive_delay    = 15,
-            poll_interval    = 5,
-            sources          = sources)
-        while True:
-            with cfg.lock:
-                cfg.concentrations = get_concentrations(cfg)
-            print('%s:%d concentrations: %s' % (cfg.sources[0].hostname, cfg.sources[0].port, cfg.concentrations))
-            packet = {}
-            AirLink.fill_in_packet(cfg, packet)
-            print('Fields to be inserted into packet: %s' % packet)
-            time.sleep(cfg.poll_interval)
-
-    main()
