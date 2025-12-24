@@ -641,9 +641,10 @@ class AQI(weewx.xtypes.XType):
         if obs_type not in [ 'pm2_5_aqi', 'pm2_5_aqi_color' ]:
             raise weewx.UnknownType(obs_type)
 
-        log.debug('get_series(%s, %s, %s, aggregate:%s, aggregate_interval:%s)' % (
-            obs_type, timestamp_to_string(timespan.start), timestamp_to_string(
-            timespan.stop), aggregate_type, aggregate_interval))
+        if extra_verbose:
+            log.debug('get_series(%s, %s, %s, aggregate:%s, aggregate_interval:%s)' % (
+                obs_type, timestamp_to_string(timespan.start), timestamp_to_string(
+                timespan.stop), aggregate_type, aggregate_interval))
 
         #  Prepare the lists that will hold the final results.
         start_vec = list()
@@ -675,9 +676,10 @@ class AQI(weewx.xtypes.XType):
                     value = AQI.compute_pm2_5_aqi(pm2_5)
                 if obs_type == 'pm2_5_aqi_color':
                     value = AQI.compute_pm2_5_aqi_color(AQI.compute_pm2_5_aqi(pm2_5))
-                log.debug('get_series(%s): %s - %s - %s' % (obs_type,
-                    timestamp_to_string(ts - interval * 60),
-                    timestamp_to_string(ts), value))
+                if extra_verbose:
+                    log.debug('get_series(%s): %s - %s - %s' % (obs_type,
+                        timestamp_to_string(ts - interval * 60),
+                        timestamp_to_string(ts), value))
                 start_vec.append(ts - interval * 60)
                 stop_vec.append(ts)
                 data_vec.append(value)
