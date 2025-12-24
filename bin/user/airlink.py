@@ -252,7 +252,7 @@ def collect_data(hostname, port, timeout, archive_interval):
                 error = j['error']
                 code = error['code']
                 message = error['message']
-                log.info('%s returned error(%d): %s' % (url, code, message))
+                log.error('%s returned error(%d): %s' % (url, code, message))
                 return None
             # If data structure type 5, convert it to 6.
             if j['data']['conditions'][0]['data_structure_type'] == 5:
@@ -260,7 +260,7 @@ def collect_data(hostname, port, timeout, archive_interval):
             # Check for sanity
             sane, msg = is_sane(j)
             if not sane:
-                log.info('Reading not sane:  %s (%s)' % (msg, j))
+                log.error('Reading not sane:  %s (%s)' % (msg, j))
                 return None
             time_of_reading = j['data']['conditions'][0]['last_report_time']
             # The reading could be old.
@@ -272,7 +272,7 @@ def collect_data(hostname, port, timeout, archive_interval):
                 # time.  Check for this by checking if concentrations.pm_1
                 # is None.
                 if j['data']['conditions'][0]['pm_1'] is None:
-                    log.info('last_report_time must be time since boot: %d seconds.  Record: %s'
+                    log.error('last_report_time must be time since boot: %d seconds.  Record: %s'
                              % (time_of_reading, j))
                 else:
                     # Not current.  (Note: Rarely, spurious timestamps (e.g., 2016 in 2020)
@@ -289,11 +289,11 @@ def collect_data(hostname, port, timeout, archive_interval):
                     # 'last_report_time': 1461926886, 'pct_pm_data_last_1_hour': 100,
                     # 'pct_pm_data_last_3_hours': 100, 'pct_pm_data_nowcast': 100,
                     # 'pct_pm_data_last_24_hours': 100}]}, 'error': None}
-                    log.info('Ignoring reading from %s--age: %d seconds.  Record: %s'
+                    log.error('Ignoring reading from %s--age: %d seconds.  Record: %s'
                              % (hostname, age_of_reading, j))
                 j = None
     except Exception as e:
-        log.info('collect_data: Attempt to fetch from: %s failed: %s.' % (hostname, e))
+        log.error('collect_data: Attempt to fetch from: %s failed: %s.' % (hostname, e))
         j = None
 
 
