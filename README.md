@@ -82,7 +82,9 @@ A skin is provided to show a sample report:
    ```
 
 1. Download the lastest master version of weewx-airlink.zip
+   ```bash
    wget -O weewx-airlink-master.zip https://github.com/evilbunny2008/weewx-airlink/archive/refs/heads/master.zip
+   ```
 
 1. Install the airlink extension.
 
