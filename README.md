@@ -45,6 +45,7 @@ weectl database add-column --type float airlink_dew_point
 weectl database add-column --type float airlink_heat_index
 weectl database add-column --type float airlink_hum
 weectl database add-column --type float airlink_temp
+weectl database add-column --type float airlink_wet_bulb
 weectl database add-column --type float pm1_0
 weectl database add-column --type float pm1_0_1m
 weectl database add-column --type float pm2_5
