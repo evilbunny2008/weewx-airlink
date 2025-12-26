@@ -40,22 +40,24 @@ and not have 50+ columns in the archive table full of nothing but nulls.
 
 You can easily add just the columns you need by using the weectl program
 
-  ``weectl database add column --type float airlink_dew_point
-    weectl database add column --type float airlink_heat_index
-    weectl database add column --type float airlink_hum
-    weectl database add column --type float airlink_temp
-    weectl database add column --type float pm1_0
-    weectl database add column --type float pm1_0_1m
-    weectl database add column --type float pm2_5
-    weectl database add column --type float pm2_5_1m
-    weectl database add column --type float pm2_5_aqi
-    weectl database add column --type int   pm2_5_aqi_color
-    weectl database add column --type float pm2_5_nowcast
-    weectl database add column --type float pm2_5_nowcast_aqi
-    weectl database add column --type int   pm2_5_nowcast_aqi_color
-    weectl database add column --type float pm10_0
-    weectl database add column --type float pm10_0_1m
-    weectl database add column --type float pm10_0_nowcast``
+```bash
+weectl database add-column --type float airlink_dew_point
+weectl database add-column --type float airlink_heat_index
+weectl database add-column --type float airlink_hum
+weectl database add-column --type float airlink_temp
+weectl database add-column --type float pm1_0
+weectl database add-column --type float pm1_0_1m
+weectl database add-column --type float pm2_5
+weectl database add-column --type float pm2_5_1m
+weectl database add-column --type float pm2_5_aqi
+weectl database add-column --type int   pm2_5_aqi_color
+weectl database add-column --type float pm2_5_nowcast
+weectl database add-column --type float pm2_5_nowcast_aqi
+weectl database add-column --type int   pm2_5_nowcast_aqi_color
+weectl database add-column --type float pm10_0
+weectl database add-column --type float pm10_0_1m
+weectl database add-column --type float pm10_0_nowcast
+```
 
 If you don't specify the column type double will most likely be used which
 uses 8 bytes per value, where as float and int numbers only need 4 bytes
@@ -75,14 +77,18 @@ A skin is provided to show a sample report:
 
 1. Install the dateutil and requests packages if you don't have them already
 
-   `sudo apt update && sudo apt -y install python3-dateutil python3-requests`
+   ```bash
+   sudo apt update && sudo apt -y install python3-dateutil python3-requests
+   ```
 
 1. Download the lastest master version of weewx-airlink.zip
    wget -O weewx-airlink-master.zip https://github.com/evilbunny2008/weewx-airlink/archive/refs/heads/master.zip
 
 1. Install the airlink extension.
 
-   `weectl extension install weewx-airlink-master.zip`
+   ```bash
+   weectl extension install weewx-airlink-master.zip
+   ```
 
 1. Edit the `AirLink` section of weewx.conf (which was created by the install
    above).  In particular, change the hostname in the section labeled Sensor1 to
@@ -98,7 +104,7 @@ A skin is provided to show a sample report:
    [airlink-proxy](https://github.com/chaunceygardiner/airlink-proxy) service.
    That service typcially uses port 8000.
 
-   ```
+   ```yaml
    [AirLink]
        extra_verbose = false
        [[Sensor1]]
@@ -113,16 +119,26 @@ A skin is provided to show a sample report:
            timeout = 5
    ```
 
- **Note: This forked version allows your to stop massive amounts of debug logging
-         which may be useful for debugging but not filling up logs in production
-         by setting extra_verbose = false**
+ **Note: This forked version allows you to stop the deluge of logging by default,
+         which may be useful for debugging, however once running if you don't limit the
+         logging by setting extra_verbose = false your logs will fill up in no time**
 
 1. Restart WeeWX
 
-1. To check for a successful install, wait for a reporting cycle, then
+```bash
+  systemctl restart weewx.service
+```
+
+1. To check for a successful install, simply check journald for errors
+
+```bash
+journalctl -n 100 -u weewx.service
+```
+
+1. After waiting for a reporting cycle, you can then
    navigate in a browser to the WeeWX site and add /airlink to the end
    of the URL (e.g., http://weewx-machine/weewx/airlink).
-   The PM2.5 and AQI graphs will fill in over time.
+   The various graphs will fill in over time.
 
 # How to access weewx-airlink fields in reports.
 
