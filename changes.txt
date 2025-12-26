@@ -3,6 +3,8 @@ weewx-airlink change history
 
 1.5.0 24/12/2025
 Numerous improvements to the forked code
+* Added a user setting in weewx.conf to disable unnessecary debug logging when in production mode
+* Extended the airlink.py python code to capture and upload data from all sensors to the database
 
 1.4 05/30/2024
 Fix broken install.
