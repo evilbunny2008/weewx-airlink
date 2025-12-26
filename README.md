@@ -8,7 +8,7 @@ from the AirLink sensor.
 
 Copyright (C)2020-2024 by John A Kline (john@johnkline.com)
 
-Forked and extended in 2025.
+Forked and extended in December 2025.
 
 **This plugin requires Python 3.7, WeeWX 5**
 
