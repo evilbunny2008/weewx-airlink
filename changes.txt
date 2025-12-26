@@ -1,6 +1,9 @@
 weewx-airlink change history
 ----------------------------
 
+1.5.0 24/12/2025
+Numerous improvements to the forked code
+
 1.4 05/30/2024
 Fix broken install.
 

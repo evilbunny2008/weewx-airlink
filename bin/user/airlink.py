@@ -44,7 +44,7 @@ extra_verbose = True
 
 log = logging.getLogger(__name__)
 
-WEEWX_AIRLINK_VERSION = "1.5.0"
+WEEWX_AIRLINK_VERSION = "1.5"
 
 if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 7):
     raise weewx.UnsupportedFeature(
@@ -843,5 +843,4 @@ class AQI(weewx.xtypes.XType):
             log.debug('get_aggregate(%s, %s, %s, aggregate:%s, select_stmt: %s, returning %s)' % (
                 obs_type, timestamp_to_string(timespan.start), timestamp_to_string(timespan.stop),
                 aggregate_type, select_stmt, value))
-
         return weewx.units.ValueTuple(value, t, g)

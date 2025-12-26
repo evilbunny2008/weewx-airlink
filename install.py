@@ -47,16 +47,10 @@ class AirLinkInstaller(ExtensionInstaller):
                     },
                 },
                 'AirLink': {
-                    'extra_verbose' : True,
+                    'extra_verbose' : False,
                     'Sensor1'  : {
                         'enable'     : True,
                         'hostname'   : 'airlink',
-                        'port'       : '80',
-                        'timeout'    : '2',
-                    },
-                    'Sensor2': {
-                        'enable'     : False,
-                        'hostname'   : 'airlink2',
                         'port'       : '80',
                         'timeout'    : '2',
                     },
