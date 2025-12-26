@@ -1,5 +1,5 @@
 # weewx-airlink
-*Open source plugin for WeeWX software.
+Open source plugin for WeeWX software.
 
 ## Description
 
