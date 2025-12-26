@@ -85,17 +85,17 @@ A skin is provided to show a sample report:
 
    ```
    [AirLink]
-       # extra_verbose = true
+       extra_verbose = false
        [[Sensor1]]
            enable = true
-           hostname = airlink
+           hostname = 192.168.0.50
            port = 80
-           timeout = 2
+           timeout = 5
        [[Sensor2]]
            enable = false
-           hostname = airlink2
-           port = 80
-           timeout = 2
+           hostname = 10.5.5.5
+           port = 8000
+           timeout = 5
    ```
 
  **Note: This forked version allows your to stop massive amounts of debug logging
