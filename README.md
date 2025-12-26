@@ -24,7 +24,7 @@ and not have 50+ columns in the archive table full of nothing but nulls.
 | airlink_heat_index      | float |
 | airlink_hum             | float |
 | airlink_temp            | float |
-| airlink_wetbulb         | float |
+| airlink_wet_bulb        | float |
 | pm1_0                   | float |
 | pm1_0_1m                | float |
 | pm2_5                   | float |
@@ -38,9 +38,24 @@ and not have 50+ columns in the archive table full of nothing but nulls.
 | pm10_0_1m               | float |
 | pm10_0_nowcast          | float |
 
-You can easily add columns by using the weectl program
+You can easily add just the columns you need by using the weectl program
 
-  ``weectl database add column --type float airlink_dew_point``
+  ``weectl database add column --type float airlink_dew_point
+    weectl database add column --type float airlink_heat_index
+    weectl database add column --type float airlink_hum
+    weectl database add column --type float airlink_temp
+    weectl database add column --type float pm1_0
+    weectl database add column --type float pm1_0_1m
+    weectl database add column --type float pm2_5
+    weectl database add column --type float pm2_5_1m
+    weectl database add column --type float pm2_5_aqi
+    weectl database add column --type int   pm2_5_aqi_color
+    weectl database add column --type float pm2_5_nowcast
+    weectl database add column --type float pm2_5_nowcast_aqi
+    weectl database add column --type int   pm2_5_nowcast_aqi_color
+    weectl database add column --type float pm10_0
+    weectl database add column --type float pm10_0_1m
+    weectl database add column --type float pm10_0_nowcast``
 
 If you don't specify the column type double will most likely be used which
 uses 8 bytes per value, where as float and int numbers only need 4 bytes
