@@ -47,7 +47,7 @@ class AirLinkInstaller(ExtensionInstaller):
                     },
                 },
                 'AirLink': {
-                    'extra_verbose' : False,
+                    'extra_verbose' : True,
                     'Sensor1'  : {
                         'enable'     : True,
                         'hostname'   : 'airlink',
