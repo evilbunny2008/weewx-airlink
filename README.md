@@ -66,7 +66,7 @@ weectl database add-column --type float pm10_0_nowcast
 
 If you don't specify the column type double will most likely be used which
 uses 8 bytes per value, where as float and int numbers only need 4 bytes
-per value which really start to add up over time.
+per value which can grow the database size unnecessarily over time.
 
 A skin is provided to show a sample report:
 ![AirLinkReport](AirLinkReport.jpg)
