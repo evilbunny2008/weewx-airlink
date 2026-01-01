@@ -1,6 +1,10 @@
 # weewx-airlink
 Open source plugin for WeeWX software.
 
+This fork only exists because the owner of the original repo has no interest in limiting debug output when running in production, not even if it's a weewx.conf option that still outputs all the debug logs by default.
+
+This fork also extended the data collection so everything the sensors pick up is now logged and graphed by default.
+
 ## Description
 
 A WeeWX plugin that gets its AirLink sensor readings either directly
