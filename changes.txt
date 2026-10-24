@@ -1,6 +1,9 @@
 weewx-airlink change history
 ----------------------------
 
+1.5.1 25/10/26
+Added github workflow to trigger a backup on SWH for every new tag
+
 1.5.0 24/12/2025
 Numerous improvements to the forked code
 * Added a user setting in weewx.conf to disable unnessecary debug logging when in production mode
